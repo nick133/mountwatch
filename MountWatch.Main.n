@@ -1,0 +1,98 @@
+/*
+ *  MountWatch version 0.1 by nicksabaka@gmail.com
+ */
+
+using Nini.Config;
+
+using Nemerle.Collections;
+using Nemerle.Extensions;
+using Nemerle.Utility;
+//using Nemerle.Text;
+
+using System;
+using System.IO;
+using System.Diagnostics;
+using System.Text;
+using System.Threading.Thread;
+//using System.Windows.Forms;
+
+
+namespace MountWatch {
+
+    module MountWatchMain
+    {
+        static Main(args : array[string]) : void
+        {
+            def conf = IniConfigSource(
+                if (args.Length > 0)
+                    args[0]
+                else
+                    Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName)
+                    + @"\"
+                    + Path.GetFileNameWithoutExtension(Process.GetCurrentProcess().MainModule.FileName)
+                    + @".ini"
+            );
+
+            conf.ExpandKeyValues();
+
+            def batchfile = conf.Configs["diskpart"].Get("batch", "portable.dpt");
+
+            mutable count = 0;
+
+            using (def ps = Process())
+            {
+                ps.StartInfo.FileName = "diskpart.exe";
+                ps.StartInfo.UseShellExecute = true;
+                ps.StartInfo.WindowStyle = ProcessWindowStyle.Minimized;
+
+                mutable batch = array(10) : array[string];
+
+                mutable cmd = conf.Configs["diskpart"].Get(count.ToString(), "");
+
+                while (cmd.Length > 0 && count <= 100)
+                {
+                    when (count >= 10)
+                        Array.Resize(ref batch, batch.Length + 1);
+
+                    batch[count] = cmd;
+
+                    count++;
+                    cmd = conf.Configs["diskpart"].Get(count.ToString(), "");
+                }
+
+                File.WriteAllLines(batchfile, batch, Encoding.UTF8);
+
+                ps.StartInfo.Arguments = "/s" + batchfile;
+
+                ignore( ps.Start() );
+            }
+
+            unless (Directory.Exists(conf.Configs["watch"].Get("volume", "p") + @":\"))
+                Sleep(conf.Configs["watch"].GetInt("delay", 1) * 1000);
+
+            File.Delete(batchfile);
+
+            count = 0;
+            mutable exe = conf.Configs["autorun"].Get("exec." + count.ToString(), "");
+
+            while (exe.Length > 0)
+            {
+                when (File.Exists(exe))
+                {
+                    def ps = Process();
+
+                    ps.StartInfo.FileName = exe;
+                    ps.StartInfo.UseShellExecute = true;
+                    ps.StartInfo.Arguments =
+                        conf.Configs["autorun"].Get("args." + count.ToString(), "");
+
+                    ignore( ps.Start() );
+                    Console.WriteLine(exe);
+                }
+
+                count++;
+                exe = conf.Configs["autorun"].Get("exec." + count.ToString(), "");
+            }
+        }
+    }
+}

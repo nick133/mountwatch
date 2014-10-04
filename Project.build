@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<project name="Portable Mount Watcher" default="build">
+<description>Watches portable BitLocker protected disk to be mounted and runs startup apps</description>
+
+<property name="target" value="Release" />
+<property name="platform" value="x64" />
+
+<property name="prog.name" value="mountwatch" />
+<property name="version" value="0.1" />
+
+<include buildfile="/usr/share/nant/Project.include" />
+
+
+<target name="build" depends="hier">
+<colourfail colour="Red">
+
+    <ncc target="${ncc.target}" output="${path.build}/${prog.name}.exe">
+        <arg line="${ncc.args}" />
+
+        <sources>
+            <include name="MountWatch.Main.n" /> 
+        </sources>
+
+        <references>
+            <include name="${ref.nini}" />
+            <!--include name="System.Windows.Forms.dll" /-->
+        </references>
+    </ncc>
+
+    <copy todir="${path.build}">
+        <fileset>
+            <include name="${ref.nini}" />
+            <include name="${path.nemerle}/Nemerle.dll" />
+            <include name="${prog.name}.ini" />
+            <include name="${pdb.nini}" if="${property::get-value('target') == 'Debug'}" />
+        </fileset>
+    </copy>
+
+    <!-- Compress all exe/dll into one executable -->
+    <if test="${property::get-value('target') == 'Release' and not
+        file::up-to-date(path.build + '/' + prog.name + '.exe',
+            path.build + '/executable.packed/' + prog.name + '.exe')}">
+        <pushcolour colour="DarkGray" />
+
+        <execcolour program="${netz.cmd}">
+            <arg line="${netz.args} -i ${prog.name}.ico" />
+            <arg line="-o ${path.build}/executable.packed" />
+            <arg value="${path.build}/${prog.name}.exe" />
+            <arg value="${ref.nini}" />
+            <arg value="${path.nemerle}/Nemerle.dll" />
+        </execcolour>
+
+        <popcolour />
+    </if>
+    <echocolour colour="Yellow" message="Build target: ${target.id}" />
+
+</colourfail>
+</target>
+
+<target name="clean" depends="cleanall" />
+
+</project>
